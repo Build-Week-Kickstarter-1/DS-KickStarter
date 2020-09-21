@@ -12,12 +12,12 @@ router = APIRouter()
 class Campaign(BaseModel):
     """Use this data model to parse the request body JSON."""
 
-    name: str
-    category: str
-    currency: str
-    deadline: str
-    goal: confloat(ge=0)
-    launched: str
+    name: str = Field(..., example='The Songs of Adelaide & Abullah')
+    category: str = Field(..., example='Publishing')
+    currency: str = Field(..., example='GBP')
+    deadline: str = Field(..., example='2015-10-09')
+    goal: confloat(ge=0) = Field(..., example=1000.00)
+    launched: str = Field(..., example='2015-08-11')
 
     def to_df(self):
         """Convert pydantic object to pandas dataframe with 1 row."""
@@ -27,6 +27,37 @@ class Campaign(BaseModel):
         df['launched'] = pd.to_datetime(df['launched'])
         return df
 
+@validator('goal')
+def goal_must_be_positive(cls, value):
+    """Validate that goal is a positive number."""
+    assert value >= 0, f'goal == {value}, must be >= 0'
+    return value
+
+@validator('name')
+def name_must_be_string(cls, value):
+    """Validate that name is a string"""
+    assert type(value) == str, f'name == {value}, must be a string'
+    assert value
+
+@validator('category')
+def category_must_be_string(cls, value):
+    """Validates that category is a string"""
+    assert type(value) == str, f'category == {value}, must be a string'
+    assert value
+
+@validator('deadline')
+def deadline_must_be_string(cls, value):
+    """Validate that deadline is a string of length 10"""
+    assert type(value) == str, f'deadline == {value}, must be a string'
+    assert len(value) == 10, f'length of deadline == {len(value)}, must be == 10'
+    assert value
+
+@validator('launched')
+def launched_must_be_string(cls, value):
+    """Validate that launch is a string of length 10"""
+    assert type(value) == str, f'deadline == {value}, must be a string'
+    assert len(value) == 10, f'length of deadline == {len(value)}, must be == 10'
+    assert value
 
 
 @router.post('/predict')
@@ -52,8 +83,7 @@ async def predict(campaign: Campaign):
 
     X_new = campaign.to_df()
     log.info(X_new)
-    y_pred = None
-    if y_pred == True:
-        return 'The campaign should succeed!'
-    elif y_pred == False:
-        return 'The campaign will probably fail.'
+    y_pred = random.choice([True, False])
+    return {
+        'prediction': y_pred
+    }
