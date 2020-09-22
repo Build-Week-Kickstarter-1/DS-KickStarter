@@ -32,10 +32,9 @@ class Campaign(BaseModel):
         df = pd.DataFrame([dict(self)])
         df['deadline'] = pd.to_datetime(df['deadline'], format='%Y/%m/%d')
         df['launched'] = pd.to_datetime(df['launched'], format='%Y/%m/%d')
-        df = df.drop(['category', 'name', 'blurb', 'country'], axis=1)
         df['campaign_length'] = df['deadline'] - df['launched']
         df['campaign_length'] = (df['campaign_length'] / np.timedelta64(1, 'D')).astype(int)
-        df = df.drop(['deadline', 'launched'], axis=1)
+        df = df.drop(['category', 'name', 'blurb', 'country', 'deadline', 'launched'], axis=1)
         return df
 
 @validator('goal')
