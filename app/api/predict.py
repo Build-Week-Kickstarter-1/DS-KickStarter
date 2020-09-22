@@ -73,6 +73,8 @@ async def predict(campaign: Campaign):
     - `goal`: The funding goal of the Kickstarter campaign
     - `launched`: The start date of the Kickstarter campaign
 
+    ### Other Categories to be added soon
+
     ### Response
     - `prediction`: boolean, at random
     - `predict_proba`: float between 0.5 and 1.0, 
