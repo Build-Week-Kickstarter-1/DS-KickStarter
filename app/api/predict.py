@@ -3,39 +3,75 @@ import random
 
 from fastapi import APIRouter
 import pandas as pd
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, confloat
 
 log = logging.getLogger(__name__)
 router = APIRouter()
 
 
-class Item(BaseModel):
+class Campaign(BaseModel):
     """Use this data model to parse the request body JSON."""
 
-    x1: float = Field(..., example=3.14)
-    x2: int = Field(..., example=-42)
-    x3: str = Field(..., example='banjo')
+    name: str = Field(..., example='The Songs of Adelaide & Abullah')
+    category: str = Field(..., example='Publishing')
+    currency: str = Field(..., example='GBP')
+    deadline: str = Field(..., example='2015-10-09')
+    goal: confloat(ge=0) = Field(..., example=1000.00)
+    launched: str = Field(..., example='2015-08-11')
 
     def to_df(self):
         """Convert pydantic object to pandas dataframe with 1 row."""
-        return pd.DataFrame([dict(self)])
 
-    @validator('x1')
-    def x1_must_be_positive(cls, value):
-        """Validate that x1 is a positive number."""
-        assert value > 0, f'x1 == {value}, must be > 0'
-        return value
+        df = pd.DataFrame([dict(self)])
+        df['deadline'] = pd.to_datetime(df['deadline'])
+        df['launched'] = pd.to_datetime(df['launched'])
+        return df
+
+@validator('goal')
+def goal_must_be_positive(cls, value):
+    """Validate that goal is a positive number."""
+    assert value >= 0, f'goal == {value}, must be >= 0'
+    return value
+
+@validator('name')
+def name_must_be_string(cls, value):
+    """Validate that name is a string"""
+    assert type(value) == str, f'name == {value}, must be a string'
+    assert value
+
+@validator('category')
+def category_must_be_string(cls, value):
+    """Validates that category is a string"""
+    assert type(value) == str, f'category == {value}, must be a string'
+    assert value
+
+@validator('deadline')
+def deadline_must_be_string(cls, value):
+    """Validate that deadline is a string of length 10"""
+    assert type(value) == str, f'deadline == {value}, must be a string'
+    assert len(value) == 10, f'length of deadline == {len(value)}, must be == 10'
+    assert value
+
+@validator('launched')
+def launched_must_be_string(cls, value):
+    """Validate that launch is a string of length 10"""
+    assert type(value) == str, f'deadline == {value}, must be a string'
+    assert len(value) == 10, f'length of deadline == {len(value)}, must be == 10'
+    assert value
 
 
 @router.post('/predict')
-async def predict(item: Item):
+async def predict(campaign: Campaign):
     """
     Make random baseline predictions for classification problem 🔮
 
     ### Request Body
-    - `x1`: positive float
-    - `x2`: integer
-    - `x3`: string
+    - `name`: The name of the Kickstarter campaign
+    - `category`: The main category of the Kickstarter campaign
+    - `currency`: The three letter abbreviation of the currency the Kickstarter is based in
+    - `deadline`: The end date of the Kickstarter campaign
+    - `goal`: The funding goal of the Kickstarter campaign
+    - `launched`: The start date of the Kickstarter campaign
 
     ### Response
     - `prediction`: boolean, at random
@@ -45,11 +81,9 @@ async def predict(item: Item):
     Replace the placeholder docstring and fake predictions with your own model.
     """
 
-    X_new = item.to_df()
+    X_new = campaign.to_df()
     log.info(X_new)
     y_pred = random.choice([True, False])
-    y_pred_proba = random.random() / 2 + 0.5
     return {
-        'prediction': y_pred,
-        'probability': y_pred_proba
+        'prediction': y_pred
     }
