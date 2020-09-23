@@ -8,11 +8,13 @@ from fastapi import APIRouter
 import pandas as pd
 from pydantic import BaseModel, Field, validator, confloat
 from typing import Dict
+from sklearn.preprocessing import LabelEncoder
 
 log = logging.getLogger(__name__)
 router = APIRouter()
 dill = open('app\\api\kickstarter.pkl', 'rb')
 model = pickle.load(dill)
+lb_make = LabelEncoder()
 
 
 class Campaign(BaseModel):
@@ -33,9 +35,11 @@ class Campaign(BaseModel):
         df['deadline'] = pd.to_datetime(df['deadline'], format='%Y/%m/%d')
         df['launched'] = pd.to_datetime(df['launched'], format='%Y/%m/%d')
         df['campaign_length'] = df['deadline'] - df['launched']
-        df['campaign_length'] = (df['campaign_length'] / np.timedelta64(1, 'D')).astype(int)
-        df = df.drop(['category', 'name', 'blurb', 'country', 'deadline', 'launched'], axis=1)
+        df['campaign_length'] = df['campaign_length'] / pd.to_timedelta(1, unit='D')
+        df = df.drop(['category', 'name', 'blurb',
+                      'country', 'deadline', 'launched'], axis=1)
         return df
+
 
 @validator('goal')
 def goal_must_be_positive(cls, value):
@@ -43,17 +47,20 @@ def goal_must_be_positive(cls, value):
     assert value >= 0, f'goal == {value}, must be >= 0'
     return value
 
+
 @validator('name')
 def name_must_be_string(cls, value):
     """Validate that name is a string"""
     assert type(value) == str, f'name == {value}, must be a string'
     assert value
 
+
 @validator('category')
 def category_must_be_string(cls, value):
     """Validates that category is a string"""
     assert type(value) == str, f'category == {value}, must be a string'
     assert value
+
 
 @validator('deadline')
 def deadline_must_be_string(cls, value):
@@ -62,6 +69,7 @@ def deadline_must_be_string(cls, value):
     assert len(value) == 10, f'length of deadline == {len(value)}, must be == 10'
     assert value
 
+
 @validator('launched')
 def launched_must_be_string(cls, value):
     """Validate that launch is a string of length 10"""
@@ -69,7 +77,7 @@ def launched_must_be_string(cls, value):
     assert len(value) == 10, f'length of deadline == {len(value)}, must be == 10'
     assert value
 
- 
+
 @validator('country')
 def country_validator(cls, value):
     """"Validates that the country is a string"""
@@ -79,30 +87,28 @@ def country_validator(cls, value):
 
 
 @router.post('/predict')
-def predict(campaign: Campaign):
+async def predict(campaign: Campaign):
     """
 
     ### Request Body
     - `name`: The name of the Kickstarter campaign
     - `blurb`: The description of the Kickstarter campaign
     - `category`: The main category of the Kickstarter campaign
-    - `country`: The ISO 3166-1 alpha 2 code of the country the Kickstarter is based in
+    - `country`: The ISO 3166-1 alpha 2 code of the country the Kickstarter
+                 is based in
     - `deadline`: The end date of the Kickstarter campaign
     - `goal`: The funding goal of the Kickstarter campaign
     - `launched`: The start date of the Kickstarter campaign
 
 
     ### Response
-    - `prediction`: boolean, 1 for success and 0 for failure
-    - `predict_proba`: float between 0.5 and 1.0, 
-    representing the predicted class's probability
+    - `prediction`: boolean, True for success and False for failure
 
     """
-
 
     X = campaign.to_df()
     log.info(X)
     y_pred = model.predict(X)
     return {
-        'prediction': y_pred[0]
+        'prediction': bool(y_pred)
     }
