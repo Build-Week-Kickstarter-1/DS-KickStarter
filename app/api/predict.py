@@ -1,20 +1,29 @@
 import logging
 import random
+import pickle
 
+import numpy as np
+import sklearn
 from fastapi import APIRouter
 import pandas as pd
 from pydantic import BaseModel, Field, validator, confloat
+from typing import Dict
+from sklearn.preprocessing import LabelEncoder
 
 log = logging.getLogger(__name__)
 router = APIRouter()
+dill = open('app\\api\kickstarter.pkl', 'rb')
+model = pickle.load(dill)
+lb_make = LabelEncoder()
 
 
 class Campaign(BaseModel):
     """Use this data model to parse the request body JSON."""
 
     name: str = Field(..., example='The Songs of Adelaide & Abullah')
+    blurb: str = Field(..., example='Phasellus viverra libero eget placerat')
     category: str = Field(..., example='Publishing')
-    currency: str = Field(..., example='GBP')
+    country: str = Field(..., example='GB')
     deadline: str = Field(..., example='2015-10-09')
     goal: confloat(ge=0) = Field(..., example=1000.00)
     launched: str = Field(..., example='2015-08-11')
@@ -23,9 +32,14 @@ class Campaign(BaseModel):
         """Convert pydantic object to pandas dataframe with 1 row."""
 
         df = pd.DataFrame([dict(self)])
-        df['deadline'] = pd.to_datetime(df['deadline'])
-        df['launched'] = pd.to_datetime(df['launched'])
+        df['deadline'] = pd.to_datetime(df['deadline'], format='%Y/%m/%d')
+        df['launched'] = pd.to_datetime(df['launched'], format='%Y/%m/%d')
+        df['campaign_length'] = df['deadline'] - df['launched']
+        df['campaign_length'] = df['campaign_length'] / pd.to_timedelta(1, unit='D')
+        df = df.drop(['category', 'name', 'blurb',
+                      'country', 'deadline', 'launched'], axis=1)
         return df
+
 
 @validator('goal')
 def goal_must_be_positive(cls, value):
@@ -33,11 +47,13 @@ def goal_must_be_positive(cls, value):
     assert value >= 0, f'goal == {value}, must be >= 0'
     return value
 
+
 @validator('name')
 def name_must_be_string(cls, value):
     """Validate that name is a string"""
     assert type(value) == str, f'name == {value}, must be a string'
     assert value
+
 
 @validator('category')
 def category_must_be_string(cls, value):
@@ -45,12 +61,14 @@ def category_must_be_string(cls, value):
     assert type(value) == str, f'category == {value}, must be a string'
     assert value
 
+
 @validator('deadline')
 def deadline_must_be_string(cls, value):
     """Validate that deadline is a string of length 10"""
     assert type(value) == str, f'deadline == {value}, must be a string'
     assert len(value) == 10, f'length of deadline == {len(value)}, must be == 10'
     assert value
+
 
 @validator('launched')
 def launched_must_be_string(cls, value):
@@ -60,30 +78,37 @@ def launched_must_be_string(cls, value):
     assert value
 
 
+@validator('country')
+def country_validator(cls, value):
+    """"Validates that the country is a string"""
+    assert type(value) == str, f'country == {value}, must be a string'
+    assert len(value) == 2, f'length of country == {len(value)}, must be == 2'
+    assert value
+
+
 @router.post('/predict')
 async def predict(campaign: Campaign):
     """
-    Make random baseline predictions for classification problem 🔮
 
     ### Request Body
     - `name`: The name of the Kickstarter campaign
+    - `blurb`: The description of the Kickstarter campaign
     - `category`: The main category of the Kickstarter campaign
-    - `currency`: The three letter abbreviation of the currency the Kickstarter is based in
+    - `country`: The ISO 3166-1 alpha 2 code of the country the Kickstarter
+                 is based in
     - `deadline`: The end date of the Kickstarter campaign
     - `goal`: The funding goal of the Kickstarter campaign
     - `launched`: The start date of the Kickstarter campaign
 
-    ### Response
-    - `prediction`: boolean, at random
-    - `predict_proba`: float between 0.5 and 1.0, 
-    representing the predicted class's probability
 
-    Replace the placeholder docstring and fake predictions with your own model.
+    ### Response
+    - `prediction`: boolean, True for success and False for failure
+
     """
 
-    X_new = campaign.to_df()
-    log.info(X_new)
-    y_pred = random.choice([True, False])
+    X = campaign.to_df()
+    log.info(X)
+    y_pred = model.predict(X)
     return {
-        'prediction': y_pred
+        'prediction': bool(y_pred)
     }
