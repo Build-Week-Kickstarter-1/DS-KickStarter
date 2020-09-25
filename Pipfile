@@ -17,6 +17,9 @@ pandas = "*"
 uvicorn = "*"
 plotly = "*"
 dill = "*"
+spacy = "*"
+nltk = "*"
+category-encoders = "*"
 
 [requires]
 python_version = "3.8"
